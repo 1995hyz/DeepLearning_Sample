@@ -7,10 +7,10 @@ from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D"""
 import os
 
-batch_size = 32
+batch_size = 16
 num_classes = 10
-epochs = 25
-data_augmentation = False
+epochs = 100
+data_augmentation = True
 num_predictions = 20
 save_dir = os.path.join(os.getcwd(), 'saved_models')
 model_name = 'keras_cifar10_trained_model.h5'
@@ -76,7 +76,7 @@ if not data_augmentation:
 else:
     print('Using real-time data augmentation.')
     # This will do preprocessing and realtime data augmentation:
-    datagen = keras.ImageDataGenerator(
+    datagen = keras.preprocessing.image.ImageDataGenerator(
         featurewise_center=False,  # set input mean to 0 over the dataset
         samplewise_center=False,  # set each sample mean to 0
         featurewise_std_normalization=False,  # divide inputs by std of the dataset
@@ -114,7 +114,7 @@ else:
                                      batch_size=batch_size),
                         epochs=epochs,
                         validation_data=(x_test, y_test),
-                        workers=4)
+                        workers=1)
 
 # Save model and weights
 if not os.path.isdir(save_dir):
