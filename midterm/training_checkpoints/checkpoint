@@ -1,0 +1,2 @@
+model_checkpoint_path: "ckpt_dim2=1400_it=49-2"
+all_model_checkpoint_paths: "ckpt_dim2=1400_it=49-2"

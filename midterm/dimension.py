@@ -80,7 +80,7 @@ class Model(tf.Module):
 if __name__ == "__main__":
     data = Data()
     dim_list = [1400,100,200,300,400,600,800,1000,1200]#10,
-    check_point_dict = {100:'ckpt_dim=100_it=9375-1', 200:'ckpt_dim=200_it=5000-1', 300:'ckpt_dim=300_it=8151-1', 400:'ckpt_dim=400_it=9591-1', 600:'ckpt_dim=600_it=9500-1', 800:'ckpt_dim=800_it=9500-1', 1000:'ckpt_dim=1000_it=9500-1', 1200:'ckpt_dim=1200_it=9500-1', 1400:'ckpt_dim=1400_it=9503-1'}
+    check_point_dict = {100:'ckpt_dim=100_it=9375-1', 200:'ckpt_dim=200_it=5000-1', 300:'ckpt_dim=300_it=8151-1', 400:'ckpt_dim=400_it=9591-1', 600:'ckpt_dim=600_it=9500-1', 800:'ckpt_dim=800_it=9500-1', 1000:'ckpt_dim=1000_it=9500-1', 1200:'ckpt_dim=1200_it=9500-1', 1400:'ckpt_dim2=1400_it=49-2'}
     for dim in dim_list:
         model = Model(dimensionality=dim)
         if dim <= 400:
@@ -140,12 +140,14 @@ if __name__ == "__main__":
                                 f""
                                 f"Test Loss => {loss_test.numpy():0.6f}, Test Accuracy => {accuracy_test:0.6f}")
             bar.refresh()
-            if (loss_test < previous_loss_test) and (save_counter >= NUM_BATCHES/20):#max of 20 saves NUM_BATCHES/20
+            #if (loss_test < previous_loss_test) and (save_counter >= NUM_BATCHES/20):#max of 20 saves NUM_BATCHES/20
+            if ((i + 1) % 50) == 0:
                 save_counter = 0
                 previous_loss_test = loss_test
-                checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
+                #checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
                 checkpoint_prefix = os.path.join(checkpoint_directory, f"ckpt_dim2={dim}_it={i}")
                 checkpoint.save(file_prefix=checkpoint_prefix)
+                exit()
             save_counter = save_counter + 1
 
         plt.plot(loss_track)

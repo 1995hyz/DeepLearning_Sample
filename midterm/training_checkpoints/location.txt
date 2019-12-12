@@ -1,0 +1,1 @@
+'training_checkpoints\\ckpt_dim=1400_it=9503-1'
