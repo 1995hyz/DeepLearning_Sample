@@ -25,12 +25,12 @@ class Data(object):
     def __init__(self, dataset_train, dataset_test):
         np.random.seed(31415)
         self.index = 500
-        self.x_train = dataset_train[0]
-        self.y_train = dataset_train[1]
-        self.x_test = dataset_test[0]
-        self.y_test = dataset_test[1]
-        self.x_train = (self.x_train.astype("float16") / 255).reshape(500, 784, 3)    # 60k is number of train images
-        self.x_test = (self.x_test.astype("float16") / 255).reshape(100, 784, 3)  # 10k is number of test images
+        self.x_train = np.array(dataset_train[0])
+        self.y_train = np.array(dataset_train[1])
+        self.x_test = np.array(dataset_test[0])
+        self.y_test = np.array(dataset_test[1])
+        self.x_train = (self.x_train.astype("float32") / 255).reshape(5000, 1024, 3)    # 5k is number of train images
+        self.x_test = (self.x_test.astype("float32") / 255).reshape(1000, 1024, 3)  # 1k is number of test images
 
     def get_batch(self, batch_size=BATCH_SIZE):
         """
@@ -56,7 +56,7 @@ def matrix_norm(matrix_in):
 
 def conv_layer(x, shape, W_parameters, b_parameters):
     W = tf.reshape(W_parameters, shape)
-    b = tf.reshape(b_parameters, [shape[3]])
+    b = tf.reshape(b_parameters, [shape[3]])    # Here, the dimension is not correct.
     return tf.nn.relu(tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME') + b)
 
 
@@ -67,16 +67,16 @@ class Model(tf.Module):
         # This allows us to not overwrite our saved weights
         if not load_flag:#To speed up training time, for higher dimensionalities we overwrite theta_0_D to the final weight vector
             #from lower dimensions. This should not affect the final results of the dimension matmul
-            self.theta_0_D = tf.random.normal(shape=[431040, 1], seed=31415, dtype="float16")    # 199210 is total number of trainable parameters
-        self.P = matrix_norm(tf.random.normal(shape=[431040, dimensionality], seed=31415, dtype="float16"))   # Projects lower dimensional adaptive wight into higher dimensional parameter-space
-        self.theta_d = tf.Variable(tf.zeros(shape=[dimensionality, 1], dtype="float16"))# This lower dimensional weight vector is the only learned parameter
+            self.theta_0_D = tf.random.normal(shape=[431040, 1], seed=31415, dtype="float32")    # 199210 is total number of trainable parameters
+        self.P = matrix_norm(tf.random.normal(shape=[431040, dimensionality], seed=31415, dtype="float32"))   # Projects lower dimensional adaptive wight into higher dimensional parameter-space
+        self.theta_d = tf.Variable(tf.zeros(shape=[dimensionality, 1], dtype="float32"))# This lower dimensional weight vector is the only learned parameter
         self.Theta_D = 0
         self.dense_w = list()
         self.dense_b = list()
         for i in range(10):
             # I'm assuming we're using 10 datasets with 10 classes each
-            self.dense_w.append(tf.Variable(tf.initializers.GlorotNormal()(shape=[10, 6144], dtype="float16")))
-            self.dense_b.append(tf.Variable(tf.initializers.GlorotNormal()(shape=[10, 6144], dtype="float16")))
+            self.dense_w.append(tf.Variable(tf.initializers.GlorotNormal()(shape=[10, 6144], dtype="float32")))
+            self.dense_b.append(tf.Variable(tf.initializers.GlorotNormal()(shape=[10, 6144], dtype="float32")))
 
     def __call__(self, image, theta_flag=1, dense_model=None):
         # This if statement allows us to save a lot of time when running the model for test
@@ -85,16 +85,16 @@ class Model(tf.Module):
         # We must now reshape Theta_D into the right weight and bias shapes. Order doesn't matter as
         # it'll just learn to the right places as long as order is consistent
         W = list()
-        W.append(self.Theta_D[0:863])
-        W.append(self.Theta_D[864:19295])
-        W.append(self.Theta_D[19296:93023])
-        W.append(self.Theta_D[93024:387935])
+        W.append(self.Theta_D[0:864])
+        W.append(self.Theta_D[864:19296])
+        W.append(self.Theta_D[19296:93024])
+        W.append(self.Theta_D[93024:387936])
 
         b = list()
-        b.append(self.Theta_D[387936:388031])
-        b.append(self.Theta_D[388032:390079])
-        b.append(self.Theta_D[390080:398271])
-        b.append(self.Theta_D[398272:431039])
+        b.append(self.Theta_D[387936:388032])
+        b.append(self.Theta_D[388032:390080])
+        b.append(self.Theta_D[390080:398272])
+        b.append(self.Theta_D[398272:431040])
 
         self.layer1 = conv_layer(image, shape=[3, 3, 3, 32], W_parameters=W[0], b_parameters=b[0])
 
@@ -123,16 +123,20 @@ class Model(tf.Module):
 
 def data_splitter():
     (x_train, y_train), (x_test, y_test) = keras.datasets.cifar100.load_data(label_mode='fine')
-    for i in range(len(x_train)):
-        class_group = math.floor(y_train[i] / 10)
-        class_pos = y_train[i] % 10
-        cifar100_x_train[class_pos].append(x_train[i])
-        cifar100_y_train[class_pos].append(np.eye(10, dtype=np.single)[y_train[i] - class_group * 10])
-    for i in range(len(x_test)):
-        class_group = math.floor(y_test[i] / 10)
-        class_pos = y_train[i] % 10
-        cifar100_x_train[class_pos].append(x_test[i])
-        cifar100_y_train[class_pos].append(np.eye(10, dtype=np.single)[y_test[i] - class_group * 10])
+    i = 0
+    for sample in x_train:
+        class_group = math.floor(y_train.item(i) / 10)
+        class_pos = y_train.item(i) % 10
+        cifar100_x_train[class_pos].append(sample)
+        cifar100_y_train[class_pos].append(np.eye(10, dtype=np.single)[y_train.item(i) - class_group * 10])
+        i += 1
+    i = 0
+    for sample in x_test:
+        class_group = math.floor(y_test.item(i) / 10)
+        class_pos = y_test.item(i) % 10
+        cifar100_x_test[class_pos].append(sample)
+        cifar100_y_test[class_pos].append(np.eye(10, dtype=np.single)[y_test.item(i) - class_group * 10])
+        i += 1
 
 
 def flip(image: tf.Tensor) -> tf.Tensor:
@@ -150,7 +154,7 @@ def color(image: tf.Tensor) -> tf.Tensor:
 
 
 def rotate(image: tf.Tensor) -> tf.Tensor:
-    return tf.image.rot90(image, tf.random_uniform(shape=[], minval=0, maxval=4, dtype=tf.int32))
+    return tf.image.rot90(image, tf.random.uniform(shape=[], minval=0, maxval=4, dtype=tf.int32))
 
 
 def zoom(image: tf.Tensor) -> tf.Tensor:
@@ -165,11 +169,11 @@ def zoom(image: tf.Tensor) -> tf.Tensor:
 
     def random_crop(img):
         # Create different crops for an image
-        crops = tf.image.crop_and_resize([img], boxes=boxes, box_ind=np.zeros(len(scales)), crop_size=(32, 32))
+        crops = tf.image.crop_and_resize([img], boxes=boxes, box_indices=np.zeros(len(scales)), crop_size=(32, 32))
         # Return a random crop
-        return crops[tf.random_uniform(shape=[], minval=0, maxval=len(scales), dtype=tf.int32)]
+        return crops[tf.random.uniform(shape=[], minval=0, maxval=len(scales), dtype=tf.int32)]
 
-    choice = tf.random_uniform(shape=[], minval=0., maxval=1., dtype=tf.float32)
+    choice = tf.random.uniform(shape=[], minval=0., maxval=1., dtype=tf.float32)
     # Only apply cropping 50% of the time
     return tf.cond(choice < 0.5, lambda: image, lambda: random_crop(image))
 
@@ -178,7 +182,7 @@ if __name__ == "__main__":
     data_splitter()
     dim_list = [400, 600, 800, 1000, 1200, 1400]
     for dim in dim_list:
-        learn_rate = dim**-1 # This seems to be an ok learning rate calculation
+        learn_rate = dim**-1    # This seems to be an ok learning rate calculation
         load = 0
         if dim > 400:
             load = 1
@@ -219,16 +223,29 @@ if __name__ == "__main__":
                             (cifar100_x_test[i_dataset], cifar100_y_test[i_dataset]))
                 with tf.GradientTape() as tape:
                     x, y = data.get_batch()
-                    dataset = tf.data.Dataset.from_tensor_slices(x)
-                    ## Data augmentation stuff
+                    dataset = x.reshape(len(x), 32, 32, 3)
+                    dataset = tf.data.Dataset.from_tensor_slices(dataset)
+                    # Data augmentation stuff
                     augmentations = [flip, color, zoom, rotate]
                     for f in augmentations:
                         dataset = dataset.map(
-                            lambda m: tf.cond(tf.random_uniform([], 0, 1) > 0.75, lambda: f(m), lambda: m),
+                            lambda m: tf.cond(tf.random.uniform([], 0, 1) > 0.75, lambda: f(m), lambda: m),
                             num_parallel_calls=4)
                     dataset = dataset.map(lambda m: tf.clip_by_value(m, 0, 1))
+                    output = np.zeros((500, 32*1, 32*1, 3))
+                    row = 0
+                    for images in dataset.repeat(1).batch(500):
+                        output[:, :, :, :] = images.numpy()
+                        break
+                        """
+                        plt.figure()
+                        plt.imshow(output[2])
+                        plt.show()
+                        print(row)
+                        row += 1
+                        """
+                    dataset = output.reshape((500, 1024, 3))
                     p = model(dataset, dense_model=i_dataset)     # Chooses which dense layer we're using
-
 
                     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=tf.squeeze(y), logits=p))
                     choice = np.argmax(p, axis=1)
@@ -237,7 +254,7 @@ if __name__ == "__main__":
                     loss_track[j_epoch][i_dataset] = loss
                     accuracy_track[j_epoch][i_dataset] = accuracy
 
-                grads = tape.gradient(loss, model.variables)#This line should only access the dims that matter but its ok. There will only be a gradient for the datasets we train on
+                grads = tape.gradient(loss, model.variables)    # This line should only access the dims that matter but its ok. There will only be a gradient for the datasets we train on
                 optimizer.apply_gradients(zip(grads, model.variables))
 
                 x_test, y_test = data.get_batch()
@@ -245,7 +262,7 @@ if __name__ == "__main__":
                 loss_test = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=tf.squeeze(y_test), logits=p_test))
                 choice_test = np.argmax(p_test, axis=1)
                 correct_choice_test = np.argmax(y_test, axis=1)
-                accuracy_test = sum(choice_test == correct_choice_test) / 1000 #1000 is size of test set
+                accuracy_test = sum(choice_test == correct_choice_test) / 1000  # 1000 is size of test set
                 loss_track_test[j_epoch][i_dataset] = loss_test
                 accuracy_track_test[j_epoch][i_dataset] = accuracy_test
 
@@ -253,7 +270,7 @@ if __name__ == "__main__":
                                     f""
                                     f"Test Loss => {loss_test.numpy():0.6f}, Test Accuracy => {accuracy_test:0.6f}")
                 bar.refresh()
-                if (loss.numpy < previous_loss) and (save_counter >= (NUM_BATCHES*9)/20):# max of 20 saves. This ensures only 20 saves
+                if (loss.numpy < previous_loss) and (save_counter >= (NUM_BATCHES*9)/20): # max of 20 saves. This ensures only 20 saves
                     save_counter = 0
                     previous_loss = loss.numpy
                     checkpoint_prefix = os.path.join(checkpoint_directory, f"ckpt_dim2={dim}_it={j_epoch}")
@@ -272,7 +289,7 @@ if __name__ == "__main__":
         plt.plot(accuracy_track)
         plt.plot(accuracy_track_test)
         plt.title(f"Accuracy for dim={dim}")
-
+        """
         ## Training on final dataset happens here
         model = Model(dimensionality=dim, load_flag=load)
         if dim > 400:
@@ -330,3 +347,4 @@ if __name__ == "__main__":
                     checkpoint.save(file_prefix=checkpoint_prefix)
                 save_counter = save_counter + 1
     f.close()
+"""
