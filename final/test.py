@@ -9,7 +9,7 @@ import math
 
 NUM_CLASSES = 10
 BATCH_SIZE = 500   # Lower is easier on memory
-NUM_BATCHES = 4000  # previously 30000
+NUM_BATCHES = 2000  # previously 30000
 # LEARNING_RATE = 10**-2#2.5*10**-3#previously 10**-2
 # MOMENTUM = .97
 f = open("log.txt", "w+")
@@ -65,16 +65,16 @@ class Model(tf.Module):
         # This allows us to not overwrite our saved weights
         if not load_flag:#To speed up training time, for higher dimensionalities we overwrite theta_0_D to the final weight vector
             #from lower dimensions. This should not affect the final results of the dimension matmul
-            self.theta_0_D = tf.random.normal(shape=[388416, 1], seed=31415, dtype="float32")    # 199210 is total number of trainable parameters
-        self.P = matrix_norm(tf.random.normal(shape=[388416, dimensionality], seed=31415, dtype="float32"))   # Projects lower dimensional adaptive wight into higher dimensional parameter-space
-        self.theta_d = tf.Variable(tf.zeros(shape=[dimensionality, 1], dtype="float32"))# This lower dimensional weight vector is the only learned parameter
+            self.theta_0_D = tf.random.normal(shape=[388416, 1], seed=31415, dtype="float16")    # 199210 is total number of trainable parameters
+        self.P = matrix_norm(tf.random.normal(shape=[388416, dimensionality], seed=31415, dtype="float16"))   # Projects lower dimensional adaptive wight into higher dimensional parameter-space
+        self.theta_d = tf.Variable(tf.zeros(shape=[dimensionality, 1], dtype="float16"))# This lower dimensional weight vector is the only learned parameter
         self.Theta_D = 0
         self.dense_w = list()
         self.dense_b = list()
         for i in range(10):
             # I'm assuming we're using 10 datasets with 10 classes each
-            self.dense_w.append(tf.Variable(tf.initializers.GlorotNormal()(shape=[256, 10], dtype="float32")))
-            self.dense_b.append(tf.Variable(tf.initializers.GlorotNormal()(shape=[10], dtype="float32")))
+            self.dense_w.append(tf.Variable(tf.initializers.GlorotNormal()(shape=[256, 10], dtype="float16")))
+            self.dense_b.append(tf.Variable(tf.initializers.GlorotNormal()(shape=[10], dtype="float16")))
 
     def __call__(self, image, theta_flag=1, dense_model=None):
         # This if statement allows us to save a lot of time when running the model for test
@@ -120,20 +120,21 @@ class Model(tf.Module):
 
 
 def data_splitter():
+    global cifar100_y_test, cifar100_x_train, cifar100_y_train, cifar100_x_test
     (x_train, y_train), (x_test, y_test) = keras.datasets.cifar100.load_data(label_mode='fine')
     i = 0
     for sample in x_train:
         class_group = math.floor(y_train.item(i) / 10)
         class_pos = y_train.item(i) % 10
-        cifar100_x_train[class_pos].append(sample)
-        cifar100_y_train[class_pos].append(np.eye(10, dtype=np.single)[y_train.item(i) - class_group * 10])
+        cifar100_x_train[class_group].append(sample)
+        cifar100_y_train[class_group].append(np.eye(10, dtype=np.single)[class_pos])
         i += 1
     i = 0
     for sample in x_test:
         class_group = math.floor(y_test.item(i) / 10)
         class_pos = y_test.item(i) % 10
-        cifar100_x_test[class_pos].append(sample)
-        cifar100_y_test[class_pos].append(np.eye(10, dtype=np.single)[y_test.item(i) - class_group * 10])
+        cifar100_x_test[class_group].append(sample)
+        cifar100_y_test[class_group].append(np.eye(10, dtype=np.single)[class_pos])
         i += 1
 
 
@@ -235,7 +236,8 @@ if __name__ == "__main__":
                     for images in dataset.repeat(1).batch(BATCH_SIZE):
                         output[:, :, :, :] = images.numpy()
 
-                    dataset = output.reshape((BATCH_SIZE, 32, 32, 3))
+                    dataset = output.reshape((BATCH_SIZE, 32, 32, 3)).astype("float16")
+                    y = y.astype("float16")
                     p = model(dataset, dense_model=i_dataset)     # Chooses which dense layer we're using
 
                     pre_loss = tf.nn.softmax_cross_entropy_with_logits(labels=tf.squeeze(y), logits=p)
@@ -250,12 +252,13 @@ if __name__ == "__main__":
                 optimizer.apply_gradients(zip(grads, [model.theta_d, model.dense_w[i_dataset],model.dense_b[i_dataset]]))
 
                 x_test, y_test = data.get_test()
-                x_test = x_test.reshape((200, 32, 32, 3))
+                x_test = x_test.reshape((200, 32, 32, 3)).astype('float16')
+                y_test = y_test.astype('float16')
                 p_test = model(x_test, 0, i_dataset)
                 loss_test = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=tf.squeeze(y_test), logits=p_test))
                 choice_test = np.argmax(p_test, axis=1)
                 correct_choice_test = np.argmax(y_test, axis=1)
-                accuracy_test = sum(choice_test == correct_choice_test) / 1000  # 1000 is size of test set
+                accuracy_test = sum(choice_test == correct_choice_test) / 200  # 1000 is size of test set
                 loss_track_test[j_epoch][i_dataset] = loss_test
                 accuracy_track_test[j_epoch][i_dataset] = accuracy_test
 
